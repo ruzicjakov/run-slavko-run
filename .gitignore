@@ -1,0 +1,60 @@
+# ============================
+# Unity generirani folderi/fajlovi - NE commitati
+# ============================
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+
+# Autogenerirani Rider/VS/VSCode fajlovi
+.vs/
+.vscode/
+.idea/
+.gradle/
+ExportedObj/
+*.csproj
+*.unityproj
+*.sln
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# Unity3D generirani meta fajlovi za gornje
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Crash log
+sysinfo.txt
+
+# Build izlazi
+*.apk
+*.aab
+*.unitypackage
+*.app
+*.exe
+*.exe.meta
+
+# Crashlytics
+crashlytics-build.properties
+
+# OS/editor smeće
+.DS_Store
+Thumbs.db
+
+# Python cache (od tools/generate_sprites.py)
+__pycache__/
+*.pyc

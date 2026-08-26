@@ -35,6 +35,15 @@ public class PlayerController : MonoBehaviour
     private bool isHanging;
     private HingeJoint2D hingeJoint;
     private HangPoint activeHangPoint;
+    private Transform activeHangTransform;
+    private LineRenderer ropeRenderer;
+
+    [Header("Vizualni konop (swing)")]
+    [Tooltip("Boja i debljina konopa koji se crta dok Slavko visi/se njiše")]
+    public float ropeWidth = 0.08f;
+    public Color ropeColor = Color.black;
+
+    private float runSuppressedUntil;
 
     private Coroutine speedBoostRoutine;
     private Coroutine powerApeRoutine;
@@ -61,11 +70,16 @@ public class PlayerController : MonoBehaviour
         else
         {
             HandleSwingRelease();
+            UpdateRopeVisual();
         }
     }
 
     private void HandleRun()
     {
+        // Nakon udarca (knockback) auto-trčanje se nakratko isključuje (vidi NotifyKnockback)
+        // da udarac stvarno odgurne Slavka umjesto da ga ova linija odmah povuče natrag u prepreku.
+        if (Time.time < runSuppressedUntil) return;
+
         // NAPOMENA: u Unity 6 "Rigidbody2D.velocity" je obilježen kao obsolete u korist
         // "linearVelocity", ali i dalje radi. Ako koristiš Unity 6+ i želiš bez upozorenja,
         // zamijeni rb.velocity -> rb.linearVelocity na svim mjestima u ovoj datoteci.
@@ -122,6 +136,7 @@ public class PlayerController : MonoBehaviour
     {
         isHanging = true;
         activeHangPoint = null;
+        activeHangTransform = point.transform;
 
         // Dinamički dodajemo HingeJoint2D vezan na fiksnu točku u prostoru (grana/uže/bandera).
         // Time Slavko počinje "swingati" oko te točke kao klatno.
@@ -130,11 +145,24 @@ public class PlayerController : MonoBehaviour
         hingeJoint.connectedAnchor = point.transform.position;
         hingeJoint.anchor = Vector2.zero;
         hingeJoint.useLimits = false;
+
+        // Vizualni "konop" između Slavka i točke vješanja dok traje swing.
+        ropeRenderer = gameObject.AddComponent<LineRenderer>();
+        ropeRenderer.positionCount = 2;
+        ropeRenderer.startWidth = ropeWidth;
+        ropeRenderer.endWidth = ropeWidth;
+        ropeRenderer.material = new Material(Shader.Find("Sprites/Default"));
+        ropeRenderer.startColor = ropeColor;
+        ropeRenderer.endColor = ropeColor;
+        ropeRenderer.sortingOrder = 5;
+        ropeRenderer.useWorldSpace = true;
+        UpdateRopeVisual();
     }
 
     private void StopHanging()
     {
         isHanging = false;
+        activeHangTransform = null;
 
         if (hingeJoint != null)
         {
@@ -142,8 +170,31 @@ public class PlayerController : MonoBehaviour
             hingeJoint = null;
         }
 
+        if (ropeRenderer != null)
+        {
+            Destroy(ropeRenderer);
+            ropeRenderer = null;
+        }
+
         // Mali boost u smjeru trenutnog zamaha kod otpuštanja (osjećaj "leta" nakon swinga).
         rb.linearVelocity *= swingReleaseBoost;
+    }
+
+    private void UpdateRopeVisual()
+    {
+        if (ropeRenderer == null || activeHangTransform == null) return;
+        ropeRenderer.SetPosition(0, transform.position);
+        ropeRenderer.SetPosition(1, activeHangTransform.position);
+    }
+
+    /// <summary>
+    /// Pozvati iz PlayerHealth.TakeHit() kad se primjenjuje knockback — nakratko isključuje
+    /// automatsko trčanje da odgurivanje unatrag stvarno odvoji Slavka od prepreke, umjesto
+    /// da HandleRun() svaki frame odmah vrati brzinu prema naprijed i zaglavi ga na mjestu.
+    /// </summary>
+    public void NotifyKnockback(float duration)
+    {
+        runSuppressedUntil = Time.time + duration;
     }
 
     // ---------- Power-up hookovi (pozivaju se iz PowerUps skripti) ----------

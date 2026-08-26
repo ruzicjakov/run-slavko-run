@@ -20,11 +20,13 @@ public class PlayerHealth : MonoBehaviour
     private bool isInvulnerable;
     private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
+    private PlayerController playerController;
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        playerController = GetComponent<PlayerController>();
     }
 
     private void Start()
@@ -56,6 +58,7 @@ public class PlayerHealth : MonoBehaviour
             {
                 rb.linearVelocity = Vector2.zero;
                 rb.AddForce(new Vector2(-knockbackForce, knockbackForce * 0.5f), ForceMode2D.Impulse);
+                playerController?.NotifyKnockback(invulnerabilityDuration);
             }
         }
         else

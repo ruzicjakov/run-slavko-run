@@ -18,7 +18,12 @@ public class GuardAI : MonoBehaviour
     [Tooltip("Ako je igrač dalje od čuvara od ove udaljenosti, čuvar ubrzava")]
     public float catchUpDistance = 6f;
 
+    [Header("Reakcija na uhvaćanje")]
+    [Tooltip("Koliko dugo čuvar stane na mjestu nakon što dotakne Slavka, prije nego nastavi potjeru")]
+    public float catchPauseDuration = 0.5f;
+
     private Rigidbody2D rb;
+    private float pausedUntil;
 
     private void Awake()
     {
@@ -35,6 +40,13 @@ public class GuardAI : MonoBehaviour
     {
         if (player == null) return;
 
+        if (Time.time < pausedUntil)
+        {
+            // Čuvar je upravo uhvatio Slavka — stoji na mjestu umjesto da prođe kroz njega.
+            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+            return;
+        }
+
         float distance = player.position.x - transform.position.x;
         float targetSpeed = distance > catchUpDistance ? catchUpSpeed : baseSpeed;
 
@@ -50,5 +62,9 @@ public class GuardAI : MonoBehaviour
         {
             health.TakeHit();
         }
+
+        // Zastani nakratko na mjestu umjesto da nastaviš kliziti kroz Slavka —
+        // on se u međuvremenu odbija unatrag (knockback iz PlayerHealth.TakeHit).
+        pausedUntil = Time.time + catchPauseDuration;
     }
 }

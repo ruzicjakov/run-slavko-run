@@ -1,20 +1,20 @@
 using System;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.UI;
+using TMPro;
 
 /// <summary>
 /// Upravlja HUD-om i ekranima (Game Over, Level Complete, Victory).
 /// Stavi ovu skriptu na GameObject u sceni razine (npr. "UIManager" unutar Canvasa)
-/// i povuci odgovarajuće Text/Panel referencе u Inspectoru.
+/// i povuci odgovarajuće TextMeshPro/Panel referencе u Inspectoru.
 /// </summary>
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance { get; private set; }
 
     [Header("HUD")]
-    public Text livesText;
-    public Text powerUpTimerText;
+    public TMP_Text livesText;
+    public TMP_Text powerUpTimerText;
 
     [Header("Ekrani (Panel GameObjecti, isključeni po defaultu)")]
     public GameObject gameOverPanel;

@@ -14,7 +14,10 @@ public class PlayerHealth : MonoBehaviour
     public int maxExtraLives = 3;
 
     [Header("Nakon pogotka")]
+    [Tooltip("Koliko dugo Slavko treperi i ne može primiti novi udarac")]
     public float invulnerabilityDuration = 1.5f;
+    [Tooltip("Koliko dugo je auto-trčanje isključeno nakon udarca — kratko, samo da odbacivanje ima efekta")]
+    public float knockbackDuration = 0.35f;
     public float knockbackForce = 4f;
 
     private bool isInvulnerable;
@@ -41,10 +44,14 @@ public class PlayerHealth : MonoBehaviour
         UIManager.Instance?.UpdateLives(extraLives);
     }
 
-    /// <summary>Pozvati kad čuvar uhvati Slavka ili kad udari u prepreku koja nanosi štetu.</summary>
-    public void TakeHit()
+    /// <summary>
+    /// Pozvati kad čuvar uhvati Slavka ili kad udari u prepreku koja nanosi štetu.
+    /// Vraća true ako je udarac stvarno primljen, a false ako je Slavko bio nepovrediv
+    /// (prepreke to koriste da ne nestanu bez razloga).
+    /// </summary>
+    public bool TakeHit()
     {
-        if (isInvulnerable) return;
+        if (isInvulnerable) return false;
 
         AudioManager.Instance?.PlayHit();
 
@@ -58,13 +65,15 @@ public class PlayerHealth : MonoBehaviour
             {
                 rb.linearVelocity = Vector2.zero;
                 rb.AddForce(new Vector2(-knockbackForce, knockbackForce * 0.5f), ForceMode2D.Impulse);
-                playerController?.NotifyKnockback(invulnerabilityDuration);
+                // Samo kratko gasimo auto-trčanje — nepovredivost traje dulje, ali kontrolu
+                // vraćamo brzo da se Slavko ne osjeća "mrtvo" 1.5 sekundi nakon svakog udarca.
+                playerController?.NotifyKnockback(knockbackDuration);
             }
+            return true;
         }
-        else
-        {
-            GameManager.Instance?.GameOver();
-        }
+
+        GameManager.Instance?.GameOver();
+        return true;
     }
 
     private IEnumerator InvulnerabilityRoutine()

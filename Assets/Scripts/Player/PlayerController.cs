@@ -34,6 +34,8 @@ public class PlayerController : MonoBehaviour
     public float maxHangDuration = 2f;
     [Tooltip("Koliko dugo nakon puštanja se ista točka ne može ponovno uhvatiti")]
     public float regrabCooldown = 0.35f;
+    [Tooltip("Koliko dugo nakon izlaska iz zone hvatanja se još uvijek može uhvatiti — oprost ako Shift stisneš malo prekasno")]
+    public float grabGraceTime = 0.15f;
     [Tooltip("Množitelj vodoravne brzine pri otpuštanju zamaha")]
     public float swingReleaseBoost = 1.15f;
     [Tooltip("Okomiti izbačaj pri otpuštanju — pretvara zamah u skok preko jame")]
@@ -54,6 +56,8 @@ public class PlayerController : MonoBehaviour
     private HangPoint activeHangPoint;
     private HangPoint currentHangPoint;
     private HangPoint lastReleasedPoint;
+    private HangPoint recentHangPoint;
+    private float recentHangPointUntil;
     private Transform activeHangTransform;
     private float hangStartTime;
     private float regrabAvailableAt;
@@ -128,12 +132,21 @@ public class PlayerController : MonoBehaviour
 
     private void HandleGrabInput()
     {
-        if (activeHangPoint == null) return;
         if (!Input.GetKey(grabKey)) return;
-        // Kratki cooldown da se ista točka ne uhvati odmah ponovno nakon puštanja.
-        if (activeHangPoint == lastReleasedPoint && Time.time < regrabAvailableAt) return;
 
-        StartHanging(activeHangPoint);
+        // Ako je upravo izašao iz zone, još kratko dopuštamo hvatanje (grabGraceTime) —
+        // bez toga treba pogoditi točku u pikselu, s tim je hvatanje osjetno praštajuće.
+        HangPoint target = activeHangPoint;
+        if (target == null && recentHangPoint != null && Time.time < recentHangPointUntil)
+        {
+            target = recentHangPoint;
+        }
+        if (target == null) return;
+
+        // Kratki cooldown da se ista točka ne uhvati odmah ponovno nakon puštanja.
+        if (target == lastReleasedPoint && Time.time < regrabAvailableAt) return;
+
+        StartHanging(target);
     }
 
     private void HandleSwingRelease()
@@ -151,6 +164,8 @@ public class PlayerController : MonoBehaviour
     public void SetHangPointAvailable(HangPoint point)
     {
         activeHangPoint = point;
+        recentHangPoint = point;
+        recentHangPointUntil = Time.time + grabGraceTime;
     }
 
     /// <summary>Poziva HangPoint kad Slavko izađe iz njegovog triggera.</summary>
@@ -159,6 +174,9 @@ public class PlayerController : MonoBehaviour
         if (activeHangPoint == point)
         {
             activeHangPoint = null;
+            // Zapamti je nakratko — hvatanje ostaje moguće još grabGraceTime sekundi.
+            recentHangPoint = point;
+            recentHangPointUntil = Time.time + grabGraceTime;
         }
     }
 

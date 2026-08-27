@@ -1,9 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// Jednostavan "rubber-band" AI za čuvara: ako igrač preveć odmakne, čuvar ubrzava
-/// da ga dostigne, a inače se kreće osnovnom brzinom. Kad dotakne Slavka (trigger),
-/// nanosi mu udarac preko PlayerHealth.TakeHit().
+/// Jednostavan "rubber-band" AI za čuvara: ako se igrač previše odmakne, čuvar ubrzava
+/// da ga dostigne, a inače se kreće osnovnom brzinom.
+/// Čuvar NIKAD ne prolazi kroz Slavka — dođe do njega, stane iza njega i čeka.
 /// Postavi Collider2D na ovom objektu kao "Is Trigger".
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
@@ -18,12 +18,11 @@ public class GuardAI : MonoBehaviour
     [Tooltip("Ako je igrač dalje od čuvara od ove udaljenosti, čuvar ubrzava")]
     public float catchUpDistance = 6f;
 
-    [Header("Reakcija na uhvaćanje")]
-    [Tooltip("Koliko dugo čuvar stane na mjestu nakon što dotakne Slavka, prije nego nastavi potjeru")]
-    public float catchPauseDuration = 0.5f;
+    [Header("Zaustavljanje kod igrača")]
+    [Tooltip("Na kojoj udaljenosti iza Slavka se čuvar zaustavlja. Nikad ne ide dalje od toga.")]
+    public float stopDistance = 0.9f;
 
     private Rigidbody2D rb;
-    private float pausedUntil;
 
     private void Awake()
     {
@@ -40,10 +39,19 @@ public class GuardAI : MonoBehaviour
     {
         if (player == null) return;
 
-        if (Time.time < pausedUntil)
+        // Tvrda granica: čuvar se ne smije naći ispred ove točke. Ovo je pouzdanije od
+        // oslanjanja na trigger događaje — oni se okinu samo jednom pri ulasku, pa je čuvar
+        // prije nastavljao kliziti kroz Slavka dok je ovaj bio zaglavljen ispred prepreke.
+        float limitX = player.position.x - stopDistance;
+
+        if (transform.position.x >= limitX)
         {
-            // Čuvar je upravo uhvatio Slavka — stoji na mjestu umjesto da prođe kroz njega.
             rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+
+            if (transform.position.x > limitX)
+            {
+                transform.position = new Vector3(limitX, transform.position.y, transform.position.z);
+            }
             return;
         }
 
@@ -55,6 +63,18 @@ public class GuardAI : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        TryHit(other);
+    }
+
+    private void OnTriggerStay2D(Collider2D other)
+    {
+        // Dok čuvar drži Slavka, pokušava ga udariti i dalje. Bez ovoga bi čuvar koji stoji
+        // na Slavku bio potpuno bezopasan, jer OnTriggerEnter2D okine samo jednom.
+        TryHit(other);
+    }
+
+    private void TryHit(Collider2D other)
+    {
         if (!other.CompareTag("Player")) return;
 
         var health = other.GetComponent<PlayerHealth>();
@@ -62,9 +82,5 @@ public class GuardAI : MonoBehaviour
         {
             health.TakeHit();
         }
-
-        // Zastani nakratko na mjestu umjesto da nastaviš kliziti kroz Slavka —
-        // on se u međuvremenu odbija unatrag (knockback iz PlayerHealth.TakeHit).
-        pausedUntil = Time.time + catchPauseDuration;
     }
 }

@@ -24,8 +24,25 @@ public class PlayerController : MonoBehaviour
     [Header("Vješanje / Swing")]
     [Tooltip("Tipka koju igrač drži da bi se uhvatio za granu/uže/banderu")]
     public KeyCode grabKey = KeyCode.LeftShift;
-    [Tooltip("Množitelj brzine pri otpuštanju zamaha (mali 'boost' pri iskakanju iz swinga)")]
+    [Tooltip("Najkraća moguća duljina konopa")]
+    public float minRopeLength = 1.2f;
+    [Tooltip("Najdulja moguća duljina konopa")]
+    public float maxRopeLength = 3f;
+    [Tooltip("Stalna sila prema naprijed dok Slavko visi — održava zamah da ne stane u mjestu")]
+    public float swingForce = 14f;
+    [Tooltip("Nakon ovoliko sekundi visenja Slavko se automatski pušta (da se igra ne zaglavi)")]
+    public float maxHangDuration = 2f;
+    [Tooltip("Koliko dugo nakon puštanja se ista točka ne može ponovno uhvatiti")]
+    public float regrabCooldown = 0.35f;
+    [Tooltip("Množitelj vodoravne brzine pri otpuštanju zamaha")]
     public float swingReleaseBoost = 1.15f;
+    [Tooltip("Okomiti izbačaj pri otpuštanju — pretvara zamah u skok preko jame")]
+    public float releaseUpwardBoost = 7f;
+
+    [Header("Vizualni konop (swing)")]
+    [Tooltip("Boja i debljina konopa koji se crta dok Slavko visi/se njiše")]
+    public float ropeWidth = 0.08f;
+    public Color ropeColor = Color.black;
 
     private Rigidbody2D rb;
     private bool isGrounded;
@@ -33,15 +50,17 @@ public class PlayerController : MonoBehaviour
     private bool canBreakObstacles;
 
     private bool isHanging;
-    private HingeJoint2D hingeJoint;
+    private DistanceJoint2D ropeJoint;
     private HangPoint activeHangPoint;
+    private HangPoint currentHangPoint;
+    private HangPoint lastReleasedPoint;
     private Transform activeHangTransform;
-    private LineRenderer ropeRenderer;
+    private float hangStartTime;
+    private float regrabAvailableAt;
 
-    [Header("Vizualni konop (swing)")]
-    [Tooltip("Boja i debljina konopa koji se crta dok Slavko visi/se njiše")]
-    public float ropeWidth = 0.08f;
-    public Color ropeColor = Color.black;
+    private GameObject ropeObject;
+    private LineRenderer ropeRenderer;
+    private Material ropeMaterial;
 
     private float runSuppressedUntil;
 
@@ -74,15 +93,22 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    private void FixedUpdate()
+    {
+        // Blagi stalni potisak naprijed dok visi — bez ovoga se klatno ugasi i Slavko
+        // samo visi u mjestu umjesto da ga zamah prenese preko jame.
+        if (isHanging && rb != null)
+        {
+            rb.AddForce(Vector2.right * swingForce, ForceMode2D.Force);
+        }
+    }
+
     private void HandleRun()
     {
         // Nakon udarca (knockback) auto-trčanje se nakratko isključuje (vidi NotifyKnockback)
         // da udarac stvarno odgurne Slavka umjesto da ga ova linija odmah povuče natrag u prepreku.
         if (Time.time < runSuppressedUntil) return;
 
-        // NAPOMENA: u Unity 6 "Rigidbody2D.velocity" je obilježen kao obsolete u korist
-        // "linearVelocity", ali i dalje radi. Ako koristiš Unity 6+ i želiš bez upozorenja,
-        // zamijeni rb.velocity -> rb.linearVelocity na svim mjestima u ovoj datoteci.
         rb.linearVelocity = new Vector2(runSpeed * speedMultiplier, rb.linearVelocity.y);
     }
 
@@ -102,18 +128,22 @@ public class PlayerController : MonoBehaviour
 
     private void HandleGrabInput()
     {
-        if (activeHangPoint != null && Input.GetKey(grabKey))
-        {
-            StartHanging(activeHangPoint);
-        }
+        if (activeHangPoint == null) return;
+        if (!Input.GetKey(grabKey)) return;
+        // Kratki cooldown da se ista točka ne uhvati odmah ponovno nakon puštanja.
+        if (activeHangPoint == lastReleasedPoint && Time.time < regrabAvailableAt) return;
+
+        StartHanging(activeHangPoint);
     }
 
     private void HandleSwingRelease()
     {
         bool releasePressed = Input.GetKeyUp(grabKey) || Input.GetButtonDown("Jump");
-        if (releasePressed)
+        bool timedOut = Time.time - hangStartTime >= maxHangDuration;
+
+        if (releasePressed || timedOut)
         {
-            StopHanging();
+            StopHanging(true);
         }
     }
 
@@ -134,66 +164,117 @@ public class PlayerController : MonoBehaviour
 
     private void StartHanging(HangPoint point)
     {
+        if (isHanging || point == null) return;
+
         isHanging = true;
-        activeHangPoint = null;
+        currentHangPoint = point;
         activeHangTransform = point.transform;
+        hangStartTime = Time.time;
 
-        // Dinamički dodajemo HingeJoint2D vezan na fiksnu točku u prostoru (grana/uže/bandera).
-        // Time Slavko počinje "swingati" oko te točke kao klatno.
-        hingeJoint = gameObject.AddComponent<HingeJoint2D>();
-        hingeJoint.autoConfigureConnectedAnchor = false;
-        hingeJoint.connectedAnchor = point.transform.position;
-        hingeJoint.anchor = Vector2.zero;
-        hingeJoint.useLimits = false;
+        Vector2 anchor = point.transform.position;
+        float currentDistance = Vector2.Distance(transform.position, anchor);
 
-        // Vizualni "konop" između Slavka i točke vješanja dok traje swing.
-        ropeRenderer = gameObject.AddComponent<LineRenderer>();
-        ropeRenderer.positionCount = 2;
-        ropeRenderer.startWidth = ropeWidth;
-        ropeRenderer.endWidth = ropeWidth;
-        ropeRenderer.material = new Material(Shader.Find("Sprites/Default"));
-        ropeRenderer.startColor = ropeColor;
-        ropeRenderer.endColor = ropeColor;
-        ropeRenderer.sortingOrder = 5;
-        ropeRenderer.useWorldSpace = true;
+        // DistanceJoint2D = konop fiksne duljine (klatno). VAŽNO: HingeJoint2D ovdje NE valja —
+        // on spaja točku na tijelu izravno s točkom vješanja, pa se Slavko "zalijepi" na granu
+        // umjesto da visi ispod nje na konopu.
+        ropeJoint = gameObject.AddComponent<DistanceJoint2D>();
+        ropeJoint.autoConfigureDistance = false;
+        ropeJoint.autoConfigureConnectedAnchor = false;
+        ropeJoint.connectedBody = null;
+        ropeJoint.connectedAnchor = anchor;
+        ropeJoint.anchor = Vector2.zero;
+        ropeJoint.distance = Mathf.Clamp(currentDistance, minRopeLength, maxRopeLength);
+        ropeJoint.maxDistanceOnly = false;
+        ropeJoint.enableCollision = false;
+
+        CreateRopeVisual();
         UpdateRopeVisual();
     }
 
-    private void StopHanging()
+    private void StopHanging(bool applyLaunch)
     {
+        if (!isHanging) return;
+
         isHanging = false;
+        lastReleasedPoint = currentHangPoint;
+        regrabAvailableAt = Time.time + regrabCooldown;
+        currentHangPoint = null;
         activeHangTransform = null;
 
-        if (hingeJoint != null)
+        if (ropeJoint != null)
         {
-            Destroy(hingeJoint);
-            hingeJoint = null;
+            Destroy(ropeJoint);
+            ropeJoint = null;
         }
 
-        if (ropeRenderer != null)
+        DestroyRopeVisual();
+
+        if (applyLaunch && rb != null)
         {
-            Destroy(ropeRenderer);
-            ropeRenderer = null;
+            // Zamah se pretvara u lansiranje naprijed-gore — to je ono što nosi Slavka preko jame.
+            Vector2 v = rb.linearVelocity;
+            float vx = Mathf.Max(Mathf.Abs(v.x), runSpeed * speedMultiplier) * swingReleaseBoost;
+            float vy = Mathf.Max(v.y, releaseUpwardBoost);
+            rb.linearVelocity = new Vector2(vx, vy);
+        }
+    }
+
+    private void CreateRopeVisual()
+    {
+        // VAŽNO: LineRenderer NE smije ići na Player objekt — on već ima SpriteRenderer,
+        // a Unity dopušta samo jedan Renderer po GameObjectu (zato se konop prije nije vidio).
+        // Zato konop crtamo na zasebnom child objektu.
+        if (ropeMaterial == null)
+        {
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            if (shader != null) ropeMaterial = new Material(shader);
         }
 
-        // Mali boost u smjeru trenutnog zamaha kod otpuštanja (osjećaj "leta" nakon swinga).
-        rb.linearVelocity *= swingReleaseBoost;
+        ropeObject = new GameObject("SwingRope");
+        ropeObject.transform.SetParent(transform, false);
+
+        ropeRenderer = ropeObject.AddComponent<LineRenderer>();
+        ropeRenderer.positionCount = 2;
+        ropeRenderer.useWorldSpace = true;
+        ropeRenderer.startWidth = ropeWidth;
+        ropeRenderer.endWidth = ropeWidth;
+        ropeRenderer.numCapVertices = 4;
+        ropeRenderer.startColor = ropeColor;
+        ropeRenderer.endColor = ropeColor;
+        ropeRenderer.textureMode = LineTextureMode.Stretch;
+        ropeRenderer.alignment = LineAlignment.View;
+        ropeRenderer.sortingOrder = 10;
+        if (ropeMaterial != null) ropeRenderer.material = ropeMaterial;
+    }
+
+    private void DestroyRopeVisual()
+    {
+        if (ropeObject != null)
+        {
+            Destroy(ropeObject);
+            ropeObject = null;
+        }
+        ropeRenderer = null;
     }
 
     private void UpdateRopeVisual()
     {
         if (ropeRenderer == null || activeHangTransform == null) return;
-        ropeRenderer.SetPosition(0, transform.position);
-        ropeRenderer.SetPosition(1, activeHangTransform.position);
+        ropeRenderer.SetPosition(0, activeHangTransform.position);
+        ropeRenderer.SetPosition(1, transform.position);
     }
 
     /// <summary>
     /// Pozvati iz PlayerHealth.TakeHit() kad se primjenjuje knockback — nakratko isključuje
     /// automatsko trčanje da odgurivanje unatrag stvarno odvoji Slavka od prepreke, umjesto
     /// da HandleRun() svaki frame odmah vrati brzinu prema naprijed i zaglavi ga na mjestu.
+    /// Ako je Slavko u tom trenutku visio, konop se prekida (bez izbačaja) da udarac ima učinka.
     /// </summary>
     public void NotifyKnockback(float duration)
     {
+        if (isHanging) StopHanging(false);
         runSuppressedUntil = Time.time + duration;
     }
 

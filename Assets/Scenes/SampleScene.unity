@@ -1969,6 +1969,7 @@ MonoBehaviour:
   extraLives: 0
   maxExtraLives: 3
   invulnerabilityDuration: 1.5
+  knockbackDuration: 0.35
   knockbackForce: 4
 --- !u!114 &2037336123
 MonoBehaviour:
@@ -2171,7 +2172,7 @@ MonoBehaviour:
   baseSpeed: 5
   catchUpSpeed: 6.5
   catchUpDistance: 5
-  catchPauseDuration: 0.5
+  stopDistance: 0.9
 --- !u!58 &1418981302
 CircleCollider2D:
   m_ObjectHideFlags: 0
@@ -2531,6 +2532,8 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   damagesPlayer: 1
+  disappearAfterHit: 1
+  removeDelay: 0.25
 --- !u!1 &900000008
 GameObject:
   m_ObjectHideFlags: 0
@@ -3280,6 +3283,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   breakEffect: {fileID: 0}
+  removeDelay: 0.25
 --- !u!1 &900000036
 GameObject:
   m_ObjectHideFlags: 0
@@ -4175,6 +4179,8 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   damagesPlayer: 1
+  disappearAfterHit: 1
+  removeDelay: 0.25
 --- !u!1 &900000069
 GameObject:
   m_ObjectHideFlags: 0
@@ -4757,6 +4763,8 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   damagesPlayer: 1
+  disappearAfterHit: 1
+  removeDelay: 0.25
 --- !u!1 &900000090
 GameObject:
   m_ObjectHideFlags: 0
@@ -5653,6 +5661,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   breakEffect: {fileID: 0}
+  removeDelay: 0.25
 --- !u!1 &900000123
 GameObject:
   m_ObjectHideFlags: 0
@@ -6401,6 +6410,8 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   damagesPlayer: 1
+  disappearAfterHit: 1
+  removeDelay: 0.25
 --- !u!1 &900000151
 GameObject:
   m_ObjectHideFlags: 0
@@ -7130,6 +7141,8 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   damagesPlayer: 1
+  disappearAfterHit: 1
+  removeDelay: 0.25
 --- !u!1 &900000177
 GameObject:
   m_ObjectHideFlags: 0

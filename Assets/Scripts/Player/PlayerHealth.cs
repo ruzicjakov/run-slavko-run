@@ -11,7 +11,8 @@ public class PlayerHealth : MonoBehaviour
     [Header("Životi")]
     [Tooltip("Broj dodatnih života (bez ovoga, prvi pogodak = Game Over)")]
     public int extraLives = 0;
-    public int maxExtraLives = 3;
+    [Tooltip("Najviše dodatnih života. Ukupno = ovo + 1 (osnovni), dakle 2 => najviše 3 života.")]
+    public int maxExtraLives = 2;
 
     [Header("Nakon pogotka")]
     [Tooltip("Koliko dugo Slavko treperi i ne može primiti novi udarac")]
@@ -34,14 +35,14 @@ public class PlayerHealth : MonoBehaviour
 
     private void Start()
     {
-        UIManager.Instance?.UpdateLives(extraLives);
+        UIManager.Instance?.UpdateLives(extraLives + 1, maxExtraLives + 1);
     }
 
     /// <summary>Pozvati iz Kokos power-upa.</summary>
     public void AddExtraLife()
     {
         extraLives = Mathf.Min(extraLives + 1, maxExtraLives);
-        UIManager.Instance?.UpdateLives(extraLives);
+        UIManager.Instance?.UpdateLives(extraLives + 1, maxExtraLives + 1);
     }
 
     /// <summary>
@@ -58,7 +59,7 @@ public class PlayerHealth : MonoBehaviour
         if (extraLives > 0)
         {
             extraLives--;
-            UIManager.Instance?.UpdateLives(extraLives);
+            UIManager.Instance?.UpdateLives(extraLives + 1, maxExtraLives + 1);
             StartCoroutine(InvulnerabilityRoutine());
 
             if (rb != null)

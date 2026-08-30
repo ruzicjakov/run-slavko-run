@@ -1,27 +1,39 @@
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
 /// Upravlja HUD-om i ekranima (Game Over, Level Complete, Victory).
-/// Stavi ovu skriptu na GameObject u sceni razine (npr. "UIManager" unutar Canvasa)
-/// i povuci odgovarajuće TextMeshPro/Panel referencе u Inspectoru.
+/// Zivoti se prikazuju kao srca gore lijevo, a trajanje power-upa kao traka
+/// koja se prazni gore desno.
 /// </summary>
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance { get; private set; }
 
-    [Header("HUD")]
-    public TMP_Text livesText;
-    public TMP_Text powerUpTimerText;
+    [Header("HUD — zivoti (srca, gore lijevo)")]
+    [Tooltip("Slike srca, redom. Koliko ih ima, toliko je najvise zivota.")]
+    public Image[] lifeIcons;
+    public Color fullHeartColor = new Color(0.90f, 0.24f, 0.27f, 1f);
+    public Color emptyHeartColor = new Color(0.27f, 0.29f, 0.33f, 1f);
 
-    [Header("Ekrani (Panel GameObjecti, isključeni po defaultu)")]
+    [Header("HUD — traka power-upa (gore desno)")]
+    [Tooltip("Cijeli objekt trake — gasi se kad nema aktivnog power-upa")]
+    public GameObject powerUpBarRoot;
+    [Tooltip("Image s Image Type = Filled, Fill Method = Horizontal")]
+    public Image powerUpFill;
+    public Color powerApeColor = new Color(1f, 0.55f, 0.15f, 1f);
+    public Color bananaColor = new Color(1f, 0.85f, 0.20f, 1f);
+
+    [Header("Ekrani (Panel GameObjecti, iskljuceni po defaultu)")]
     public GameObject gameOverPanel;
     public GameObject levelCompletePanel;
     public GameObject victoryPanel;
 
     private Action pendingNextLevelAction;
+    private Coroutine powerUpRoutine;
 
     private void Awake()
     {
@@ -33,34 +45,55 @@ public class UIManager : MonoBehaviour
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
         if (levelCompletePanel != null) levelCompletePanel.SetActive(false);
         if (victoryPanel != null) victoryPanel.SetActive(false);
-        if (powerUpTimerText != null) powerUpTimerText.text = "";
+        if (powerUpBarRoot != null) powerUpBarRoot.SetActive(false);
     }
 
-    public void UpdateLives(int extraLives)
+    /// <summary>Pali srca do broja "current"; ostala zatamnjuje.</summary>
+    public void UpdateLives(int current, int max)
     {
-        if (livesText != null)
+        if (lifeIcons == null) return;
+
+        for (int i = 0; i < lifeIcons.Length; i++)
         {
-            livesText.text = "Životi: " + extraLives;
+            if (lifeIcons[i] == null) continue;
+
+            // Srca iznad dopustenog maksimuma se sakriju u potpunosti.
+            bool exists = i < max;
+            lifeIcons[i].enabled = exists;
+            if (exists)
+            {
+                lifeIcons[i].color = i < current ? fullHeartColor : emptyHeartColor;
+            }
         }
     }
 
     public void ShowPowerUpTimer(string powerUpName, float duration)
     {
-        if (powerUpTimerText == null) return;
-        StopCoroutine(nameof(PowerUpTimerRoutine));
-        StartCoroutine(PowerUpTimerRoutine(powerUpName, duration));
+        if (powerUpFill == null || powerUpBarRoot == null) return;
+
+        // Cuvamo referencu na korutinu. StopCoroutine(nameof(...)) NE zaustavlja
+        // korutinu pokrenutu izravnim pozivom, pa bi se kod dva power-upa zaredom
+        // dvije korutine borile oko iste trake.
+        if (powerUpRoutine != null) StopCoroutine(powerUpRoutine);
+        powerUpRoutine = StartCoroutine(PowerUpTimerRoutine(powerUpName, duration));
     }
 
     private IEnumerator PowerUpTimerRoutine(string powerUpName, float duration)
     {
+        powerUpBarRoot.SetActive(true);
+        powerUpFill.color = powerUpName.StartsWith("Banana") ? bananaColor : powerApeColor;
+
         float remaining = duration;
         while (remaining > 0f)
         {
-            powerUpTimerText.text = powerUpName + ": " + remaining.ToString("F1") + "s";
+            powerUpFill.fillAmount = Mathf.Clamp01(remaining / duration);
             yield return null;
             remaining -= Time.deltaTime;
         }
-        powerUpTimerText.text = "";
+
+        powerUpFill.fillAmount = 0f;
+        powerUpBarRoot.SetActive(false);
+        powerUpRoutine = null;
     }
 
     // ---------- Game Over ----------
@@ -70,14 +103,14 @@ public class UIManager : MonoBehaviour
         if (gameOverPanel != null) gameOverPanel.SetActive(true);
     }
 
-    /// <summary>Zakači na OnClick gumba "Retry" na Game Over ekranu.</summary>
+    /// <summary>Zakaci na OnClick gumba "Retry" na Game Over ekranu.</summary>
     public void OnRetryButton()
     {
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
         GameManager.Instance?.RestartLevel();
     }
 
-    /// <summary>Zakači na OnClick gumba "Main Menu".</summary>
+    /// <summary>Zakaci na OnClick gumba "Main Menu".</summary>
     public void OnMainMenuButton()
     {
         GameManager.Instance?.ReturnToMainMenu();
@@ -91,7 +124,7 @@ public class UIManager : MonoBehaviour
         if (levelCompletePanel != null) levelCompletePanel.SetActive(true);
     }
 
-    /// <summary>Zakači na OnClick gumba "Next Level".</summary>
+    /// <summary>Zakaci na OnClick gumba "Next Level".</summary>
     public void OnNextLevelButton()
     {
         if (levelCompletePanel != null) levelCompletePanel.SetActive(false);

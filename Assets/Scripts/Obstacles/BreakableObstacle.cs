@@ -36,7 +36,7 @@ public class BreakableObstacle : MonoBehaviour
         var health = collision.collider.GetComponent<PlayerHealth>();
         if (health == null) return;
 
-        if (!health.TakeHit()) return;
+        if (!health.Stumble()) return;
 
         alreadyHit = true;
 

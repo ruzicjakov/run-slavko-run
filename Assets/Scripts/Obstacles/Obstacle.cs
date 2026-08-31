@@ -28,7 +28,7 @@ public class Obstacle : MonoBehaviour
         if (health == null) return;
 
         // TakeHit vraća false ako je Slavko trenutno nepovrediv — tada prepreka ostaje.
-        if (!health.TakeHit()) return;
+        if (!health.Stumble()) return;
 
         alreadyHit = true;
         if (disappearAfterHit) RemoveSelf();

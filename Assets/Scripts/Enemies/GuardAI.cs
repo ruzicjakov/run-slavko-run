@@ -1,28 +1,54 @@
 using UnityEngine;
 
 /// <summary>
-/// Jednostavan "rubber-band" AI za čuvara: ako se igrač previše odmakne, čuvar ubrzava
-/// da ga dostigne, a inače se kreće osnovnom brzinom.
-/// Čuvar NIKAD ne prolazi kroz Slavka — dođe do njega, stane iza njega i čeka.
-/// Postavi Collider2D na ovom objektu kao "Is Trigger".
+/// Cuvar koji progoni Slavka.
+///
+/// Model je "rubber-band": ako Slavko odmakne dalje od catchUpDistance, cuvar sprinta,
+/// a inace trci osnovnom brzinom, koja je namjerno malo manja od Slavkove. Zbog toga se
+/// razmak ustali oko catchUpDistance, sto je znatno vise od dohvata — u cistoj voznji
+/// cuvar NIKAD ne uhvati Slavka, i to je namjerno.
+///
+/// Cuvar postaje opasan tek kad Slavko izgubi tlo. Svaki sudar s preprekom ga posrne
+/// (PlayerHealth.Stumble) i razmak skokovito padne. Jedno posrtanje cuvar ne stigne
+/// iskoristiti, ali drugo posrtanje prije nego se razmak oporavi znaci da cuvar ude u
+/// dohvat i oduzme zivot.
+///
+/// Hvatanje se provjerava PO UDALJENOSTI, a ne preko trigger dogadaja. Trigger se okine
+/// samo pri ulasku, pa je cuvar prije znao stajati Slavku za vratom a da ga nikad ne
+/// pogodi: nepovredivost bi istekla tek kad se collideri vise ne dodiruju.
 /// </summary>
 [RequireComponent(typeof(Rigidbody2D))]
 public class GuardAI : MonoBehaviour
 {
-    [Header("Referenca na igrača (ostavi prazno za automatsko pronalaženje po tagu 'Player')")]
+    [Header("Referenca na igraca (ostavi prazno za automatsko pronalazenje po tagu 'Player')")]
     public Transform player;
 
     [Header("Brzina (postavlja se i iz LevelManager-a po razini)")]
     public float baseSpeed = 5.5f;
     public float catchUpSpeed = 8f;
-    [Tooltip("Ako je igrač dalje od čuvara od ove udaljenosti, čuvar ubrzava")]
-    public float catchUpDistance = 6f;
+    [Tooltip("Ako je igrac dalje od cuvara od ove udaljenosti, cuvar ubrzava")]
+    public float catchUpDistance = 3f;
 
-    [Header("Zaustavljanje kod igrača")]
-    [Tooltip("Na kojoj udaljenosti iza Slavka se čuvar zaustavlja. Nikad ne ide dalje od toga.")]
+    [Header("Zaustavljanje kod igraca")]
+    [Tooltip("Na kojoj udaljenosti iza Slavka se cuvar zaustavlja. Nikad ne ide dalje od toga.")]
     public float stopDistance = 0.9f;
 
+    [Header("Hvatanje")]
+    [Tooltip("Na kojoj udaljenosti cuvar zgrabi Slavka. Mora biti malo vece od stopDistance, " +
+             "inace hvatanje ovisi o tome dodiruju li se collideri bas u tom kadru.")]
+    public float reachDistance = 1.05f;
+
+    [Tooltip("Najveca razlika u visini pri kojoj cuvar jos moze zgrabiti Slavka. " +
+             "Sprjecava hvatanje dok Slavko visi na uzetu iznad cuvara.")]
+    public float reachHeight = 1.5f;
+
+    [Tooltip("Koliko dugo cuvar stoji nakon sto uspjesno pogodi Slavka. Bez toga bi ga " +
+             "drzao i pogadao iznova svaki put kad istekne nepovredivost.")]
+    public float recoilDuration = 0.7f;
+
     private Rigidbody2D rb;
+    private PlayerHealth playerHealth;
+    private float recoilUntil;
 
     private void Awake()
     {
@@ -33,15 +59,26 @@ public class GuardAI : MonoBehaviour
             var found = GameObject.FindGameObjectWithTag("Player");
             if (found != null) player = found.transform;
         }
+
+        if (player != null)
+        {
+            playerHealth = player.GetComponent<PlayerHealth>();
+        }
     }
 
     private void FixedUpdate()
     {
         if (player == null) return;
 
-        // Tvrda granica: čuvar se ne smije naći ispred ove točke. Ovo je pouzdanije od
-        // oslanjanja na trigger događaje — oni se okinu samo jednom pri ulasku, pa je čuvar
-        // prije nastavljao kliziti kroz Slavka dok je ovaj bio zaglavljen ispred prepreke.
+        // Nakon uspjesnog pogotka cuvar nakratko stoji i pusta Slavka da pobjegne.
+        if (Time.time < recoilUntil)
+        {
+            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+            return;
+        }
+
+        // Tvrda granica: cuvar se ne smije naci ispred ove tocke. Pouzdanije je od
+        // oslanjanja na sudare, jer vrijedi u svakom koraku fizike.
         float limitX = player.position.x - stopDistance;
 
         if (transform.position.x >= limitX)
@@ -52,6 +89,8 @@ public class GuardAI : MonoBehaviour
             {
                 transform.position = new Vector3(limitX, transform.position.y, transform.position.z);
             }
+
+            TryHit();
             return;
         }
 
@@ -59,28 +98,23 @@ public class GuardAI : MonoBehaviour
         float targetSpeed = distance > catchUpDistance ? catchUpSpeed : baseSpeed;
 
         rb.linearVelocity = new Vector2(targetSpeed, rb.linearVelocity.y);
-    }
 
-    private void OnTriggerEnter2D(Collider2D other)
-    {
-        TryHit(other);
-    }
-
-    private void OnTriggerStay2D(Collider2D other)
-    {
-        // Dok čuvar drži Slavka, pokušava ga udariti i dalje. Bez ovoga bi čuvar koji stoji
-        // na Slavku bio potpuno bezopasan, jer OnTriggerEnter2D okine samo jednom.
-        TryHit(other);
-    }
-
-    private void TryHit(Collider2D other)
-    {
-        if (!other.CompareTag("Player")) return;
-
-        var health = other.GetComponent<PlayerHealth>();
-        if (health != null)
+        if (distance <= reachDistance &&
+            Mathf.Abs(player.position.y - transform.position.y) <= reachHeight)
         {
-            health.TakeHit();
+            TryHit();
+        }
+    }
+
+    private void TryHit()
+    {
+        if (playerHealth == null) return;
+
+        // +1 = odbaci Slavka NAPRIJED, dalje od cuvara. Da ga odbacujemo unatrag,
+        // letio bi ravno u cuvara i bio bi pogoden iznova.
+        if (playerHealth.TakeHit(1f))
+        {
+            recoilUntil = Time.time + recoilDuration;
         }
     }
 }

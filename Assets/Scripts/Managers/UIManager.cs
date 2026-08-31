@@ -40,6 +40,13 @@ public class UIManager : MonoBehaviour
         Instance = this;
     }
 
+    private void OnDestroy()
+    {
+        // Bez ovoga Instance nakon promjene scene pokazuje na unistenu komponentu,
+        // pa "Instance?.Nesto()" baca MissingReferenceException umjesto da preskoci.
+        if (Instance == this) Instance = null;
+    }
+
     private void Start()
     {
         if (gameOverPanel != null) gameOverPanel.SetActive(false);
@@ -94,6 +101,14 @@ public class UIManager : MonoBehaviour
         powerUpFill.fillAmount = 0f;
         powerUpBarRoot.SetActive(false);
         powerUpRoutine = null;
+    }
+
+    /// <summary>Je li otvoren neki od ekrana koji zaustavljaju igru.</summary>
+    public bool AnyScreenOpen()
+    {
+        return (gameOverPanel != null && gameOverPanel.activeSelf)
+            || (levelCompletePanel != null && levelCompletePanel.activeSelf)
+            || (victoryPanel != null && victoryPanel.activeSelf);
     }
 
     // ---------- Game Over ----------

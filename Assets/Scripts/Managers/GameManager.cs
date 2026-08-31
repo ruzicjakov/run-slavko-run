@@ -3,18 +3,21 @@ using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Globalni "singleton" koji upravlja tijekom igre: redoslijedom razina,
-/// Game Over/Victory stanjem i prijelazima između scena.
-/// Stavi ovu skriptu na jedan GameObject u PRVOJ sceni (npr. MainMenu) — preživljava
-/// prelazak scena zahvaljujući DontDestroyOnLoad.
+/// Game Over/Victory stanjem i prijelazima izmedu scena.
+/// Stavi ovu skriptu na jedan GameObject u PRVOJ sceni (npr. MainMenu) — prezivljava
+/// prelazak scena zahvaljujuci DontDestroyOnLoad.
 /// </summary>
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    [Header("Redoslijed razina (nazivi scena točno kao u Build Settings)")]
+    /// <summary>Kljuc pod kojim se u PlayerPrefs pamti dokle je igrac stigao.</summary>
+    private const string SaveKey = "SlavkoSavedLevel";
+
+    [Header("Redoslijed razina (nazivi scena tocno kao u Build Settings)")]
     public string[] levelScenes =
     {
-        "Level1_Zoo",
+        "SampleScene",
         "Level2_City",
         "Level3_Forest",
         "Level4_Factory"
@@ -39,15 +42,69 @@ public class GameManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    /// <summary>Pokreni prvu razinu (npr. iz gumba "Start Game" na glavnom izborniku).</summary>
+    // ---------- Spremljeni napredak ----------
+
+    /// <summary>Postoji li spremljena razina na koju se moze nastaviti.</summary>
+    public static bool HasSavedProgress()
+    {
+        return PlayerPrefs.GetInt(SaveKey, 0) > 0;
+    }
+
+    /// <summary>Redni broj spremljene razine za prikaz (1-based), 0 ako nema.</summary>
+    public static int SavedLevelNumber()
+    {
+        return PlayerPrefs.GetInt(SaveKey, 0) + 1;
+    }
+
+    private void SaveProgress()
+    {
+        PlayerPrefs.SetInt(SaveKey, currentLevelIndex);
+        PlayerPrefs.Save();
+    }
+
+    private static void ClearProgress()
+    {
+        PlayerPrefs.DeleteKey(SaveKey);
+        PlayerPrefs.Save();
+    }
+
+    // ---------- Pokretanje ----------
+
+    /// <summary>Nova igra od prve razine (gumb "Igraj").</summary>
     public void StartGame()
     {
-        currentLevelIndex = 0;
+        ClearProgress();
+        LoadLevelAt(0);
+    }
+
+    /// <summary>Nastavak od zadnje dosegnute razine (gumb "Nastavi").</summary>
+    public void ContinueGame()
+    {
+        int saved = Mathf.Clamp(PlayerPrefs.GetInt(SaveKey, 0), 0, levelScenes.Length - 1);
+        LoadLevelAt(saved);
+    }
+
+    private void LoadLevelAt(int index)
+    {
+        currentLevelIndex = index;
         IsGameOver = false;
         Time.timeScale = 1f;
         Checkpoint.ResetCheckpoint();
         SceneManager.LoadScene(levelScenes[currentLevelIndex]);
     }
+
+    /// <summary>Izlaz iz igre (gumb "Izadi"). U Editoru samo zaustavlja Play Mode.</summary>
+    public void QuitGame()
+    {
+        Time.timeScale = 1f;
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    // ---------- Tijek igre ----------
 
     public void GameOver()
     {
@@ -72,11 +129,14 @@ public class GameManager : MonoBehaviour
 
         if (currentLevelIndex >= levelScenes.Length)
         {
+            // Igra je predena — napredak vise nema smisla cuvati.
+            ClearProgress();
             Time.timeScale = 0f;
             UIManager.Instance?.ShowVictory();
         }
         else
         {
+            SaveProgress();
             Time.timeScale = 0f;
             UIManager.Instance?.ShowLevelComplete(LoadNextLevel);
         }

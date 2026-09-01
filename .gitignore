@@ -58,3 +58,6 @@ Thumbs.db
 # Python cache (od tools/generate_sprites.py)
 __pycache__/
 *.pyc
+
+# Izlaz skripti za generiranje sadrzaja
+tools/izlaz/

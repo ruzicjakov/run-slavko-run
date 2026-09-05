@@ -15,18 +15,65 @@ public class MainMenuController : MonoBehaviour
     [Tooltip("Gumb Nastavi — bit ce onemogucen ako nema spremljene razine")]
     public Button continueButton;
 
+    [Header("Ploce izbornika")]
+    [Tooltip("Grupa s naslovom i gumbima — sakriva se dok je otvoren uvod ili zasluge")]
+    public GameObject menuRoot;
+
+    [Tooltip("Uvodna ploca: tko je Slavko, zasto bjezi i koji je cilj")]
+    public GameObject introPanel;
+
+    [Tooltip("Ploca sa zaslugama")]
+    public GameObject creditsPanel;
+
     private void Start()
     {
         if (continueButton != null)
         {
             continueButton.interactable = GameManager.HasSavedProgress();
         }
+
+        if (introPanel != null) introPanel.SetActive(false);
+        if (creditsPanel != null) creditsPanel.SetActive(false);
+        if (menuRoot != null) menuRoot.SetActive(true);
     }
 
-    /// <summary>Gumb "Igraj" — nova igra od prve razine.</summary>
+    /// <summary>
+    /// Gumb "Igraj". Nova igra ne pocinje odmah, nego se prvo prikaze uvodna ploca
+    /// koja igracu daje kontekst price — bez nje igrac ne zna tko je Slavko ni zasto bjezi.
+    /// Ako uvodna ploca nije postavljena, igra pocinje izravno.
+    /// </summary>
     public void Play()
     {
+        if (introPanel == null)
+        {
+            StartGameNow();
+            return;
+        }
+
+        if (menuRoot != null) menuRoot.SetActive(false);
+        introPanel.SetActive(true);
+    }
+
+    /// <summary>Gumb "Krenimo" na uvodnoj ploci.</summary>
+    public void StartGameNow()
+    {
         if (GameManager.Instance != null) GameManager.Instance.StartGame();
+    }
+
+    /// <summary>Gumb "Zasluge" u izborniku.</summary>
+    public void ShowCredits()
+    {
+        if (creditsPanel == null) return;
+        if (menuRoot != null) menuRoot.SetActive(false);
+        creditsPanel.SetActive(true);
+    }
+
+    /// <summary>Gumb "Natrag" na ploci uvoda ili zasluga.</summary>
+    public void BackToMenu()
+    {
+        if (introPanel != null) introPanel.SetActive(false);
+        if (creditsPanel != null) creditsPanel.SetActive(false);
+        if (menuRoot != null) menuRoot.SetActive(true);
     }
 
     /// <summary>Gumb "Nastavi" — od zadnje dosegnute razine.</summary>

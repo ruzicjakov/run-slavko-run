@@ -61,3 +61,6 @@ __pycache__/
 
 # Izlaz skripti za generiranje sadrzaja
 tools/izlaz/
+
+# Snimke gameplaya
+Video/

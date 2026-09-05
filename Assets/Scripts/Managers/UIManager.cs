@@ -27,6 +27,10 @@ public class UIManager : MonoBehaviour
     public Color powerApeColor = new Color(1f, 0.55f, 0.15f, 1f);
     public Color bananaColor = new Color(1f, 0.85f, 0.20f, 1f);
 
+    [Header("HUD — napredak kroz razinu (gore sredina)")]
+    [Tooltip("Image s Image Type = Filled, Fill Method = Horizontal")]
+    public Image levelProgressFill;
+
     [Header("Ekrani (Panel GameObjecti, iskljuceni po defaultu)")]
     public GameObject gameOverPanel;
     public GameObject levelCompletePanel;
@@ -72,6 +76,13 @@ public class UIManager : MonoBehaviour
                 lifeIcons[i].color = i < current ? fullHeartColor : emptyHeartColor;
             }
         }
+    }
+
+    /// <summary>Postavlja traku napretka; t je udio prijedene razine, 0 do 1.</summary>
+    public void SetLevelProgress(float t)
+    {
+        if (levelProgressFill == null) return;
+        levelProgressFill.fillAmount = Mathf.Clamp01(t);
     }
 
     public void ShowPowerUpTimer(string powerUpName, float duration)

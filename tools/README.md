@@ -15,8 +15,9 @@ pip install pillow numpy matplotlib
 
 | Skripta | Što generira | Kamo u projektu |
 |---|---|---|
-| `generate_sprites.py` | Slavko, čuvar, sanduci, kokos, napitci, srca | `Assets/Art/` |
-| `make_art.py` | pozadine u tri sloja i pločice tla za 4 teme | `Assets/Art/` |
+| `generate_sprites.py` | Slavko, čuvar, sanduci, kokos, napitci, srca | `Assets/Sprites/` |
+| `make_art.py` | pozadine u tri sloja i pločice tla za 4 teme | `Assets/Sprites/Ground/` |
+| `make_newart.py` | viseća prepreka, pokretna traka, ciljna vrata, uvodna slika | `Assets/Sprites/` |
 | `make_audio.py` | 5 glazbenih petlji i 4 zvučna efekta | `Assets/Audio/` |
 | `make_diagrams.py` | dijagrami za dokumentaciju | `Dokumentacija/` |
 | `make_chase_chart.py` | graf potjere za dokumentaciju | `Dokumentacija/` |

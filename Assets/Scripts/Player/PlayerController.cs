@@ -49,6 +49,9 @@ public class PlayerController : MonoBehaviour
     private Rigidbody2D rb;
     private bool isGrounded;
     private float speedMultiplier = 1f;
+    // Faktor koji dolazi iz okoline, npr. pokretne trake u tvornici. Odvojen je od
+    // speedMultiplier (power-up) da se dva ucinka mogu preklapati bez da se gaze.
+    private float envSpeedFactor = 1f;
     private bool canBreakObstacles;
 
     private bool isHanging;
@@ -73,6 +76,9 @@ public class PlayerController : MonoBehaviour
 
     public bool IsHanging => isHanging;
     public bool CanBreakObstacles => canBreakObstacles;
+
+    /// <summary>Trenutni utjecaj okoline na brzinu; 1 znaci da Slavko nije na traci.</summary>
+    public float EnvironmentSpeedFactor => envSpeedFactor;
 
     private void Awake()
     {
@@ -113,7 +119,8 @@ public class PlayerController : MonoBehaviour
         // da udarac stvarno odgurne Slavka umjesto da ga ova linija odmah povuče natrag u prepreku.
         if (Time.time < runSuppressedUntil) return;
 
-        rb.linearVelocity = new Vector2(runSpeed * speedMultiplier, rb.linearVelocity.y);
+        rb.linearVelocity = new Vector2(runSpeed * speedMultiplier * envSpeedFactor,
+                                        rb.linearVelocity.y);
     }
 
     private void HandleJumpInput()
@@ -290,6 +297,15 @@ public class PlayerController : MonoBehaviour
     /// da HandleRun() svaki frame odmah vrati brzinu prema naprijed i zaglavi ga na mjestu.
     /// Ako je Slavko u tom trenutku visio, konop se prekida (bez izbačaja) da udarac ima učinka.
     /// </summary>
+    /// <summary>
+    /// Postavlja utjecaj okoline na brzinu trcanja. Poziva ConveyorBelt pri ulasku
+    /// na traku i pri izlasku s nje (tada s vrijednoscu 1).
+    /// </summary>
+    public void SetEnvironmentSpeedFactor(float factor)
+    {
+        envSpeedFactor = Mathf.Max(0.1f, factor);
+    }
+
     public void NotifyKnockback(float duration)
     {
         if (isHanging) StopHanging(false);

@@ -46,9 +46,26 @@ public class GuardAI : MonoBehaviour
              "drzao i pogadao iznova svaki put kad istekne nepovredivost.")]
     public float recoilDuration = 0.7f;
 
+    [Header("Nalet (uvedeno u razini 4)")]
+    [Tooltip("Svakoliko sekundi cuvar krene u nalet. 0 iskljucuje nalete.")]
+    public float burstInterval;
+
+    [Tooltip("Koliko nalet traje")]
+    public float burstDuration = 1f;
+
+    [Tooltip("Brzina tijekom naleta. Tijekom naleta cuvar ne postuje granicu " +
+             "catchUpDistance, nego juri punom brzinom.")]
+    public float burstSpeed = 9f;
+
     private Rigidbody2D rb;
     private PlayerHealth playerHealth;
+    private PlayerController playerController;
     private float recoilUntil;
+    private float nextBurstAt = -1f;
+    private float burstUntil;
+
+    /// <summary>Je li cuvar trenutno u naletu — koristi se za vizualnu najavu.</summary>
+    public bool IsBursting => Time.time < burstUntil;
 
     private void Awake()
     {
@@ -63,6 +80,7 @@ public class GuardAI : MonoBehaviour
         if (player != null)
         {
             playerHealth = player.GetComponent<PlayerHealth>();
+            playerController = player.GetComponent<PlayerController>();
         }
     }
 
@@ -95,7 +113,49 @@ public class GuardAI : MonoBehaviour
         }
 
         float distance = player.position.x - transform.position.x;
-        float targetSpeed = distance > catchUpDistance ? catchUpSpeed : baseSpeed;
+
+        // Nalet: cuvar povremeno pojuri punom brzinom bez obzira na razmak. Sam po sebi
+        // ne uspije uhvatiti Slavka, ali mu se toliko priblizi da svaka pogreska
+        // napravljena tijekom naleta znaci gubitak zivota.
+        float targetSpeed;
+        // Nalet i usporavajuca traka ne smiju se preklapati. Oba pritiska smanjuju
+        // razmak, a zajedno ga smanje toliko da cuvar uhvati Slavka bez ijedne
+        // njegove pogreske. Zato traka ima prednost: dok je Slavko na njoj, cuvar
+        // nalet niti pokrece niti nastavlja.
+        bool slowed = playerController != null &&
+                      playerController.EnvironmentSpeedFactor < 0.95f;
+
+        if (slowed)
+        {
+            burstUntil = 0f;
+        }
+
+        if (burstInterval > 0f)
+        {
+            if (nextBurstAt < 0f) nextBurstAt = Time.time + burstInterval;
+
+            if (Time.time >= nextBurstAt)
+            {
+                if (slowed)
+                {
+                    nextBurstAt = Time.time + 0.5f;
+                }
+                else
+                {
+                    burstUntil = Time.time + burstDuration;
+                    nextBurstAt = Time.time + burstInterval;
+                }
+            }
+        }
+
+        if (Time.time < burstUntil)
+        {
+            targetSpeed = burstSpeed;
+        }
+        else
+        {
+            targetSpeed = distance > catchUpDistance ? catchUpSpeed : baseSpeed;
+        }
 
         rb.linearVelocity = new Vector2(targetSpeed, rb.linearVelocity.y);
 

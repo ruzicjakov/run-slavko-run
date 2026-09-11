@@ -21,6 +21,8 @@ pip install pillow numpy matplotlib
 | `make_audio.py` | 5 glazbenih petlji i 4 zvučna efekta | `Assets/Audio/` |
 | `make_diagrams.py` | dijagrami za dokumentaciju | `Dokumentacija/` |
 | `make_chase_chart.py` | graf potjere za dokumentaciju | `Dokumentacija/` |
+| `make_arch.py` | dijagram arhitekture i dijagram razlika među razinama | `Dokumentacija/` |
+| `sim_chain.py` | dimenzioniranje lančane jame (širina i razmak točaka vješanja) | ispis u terminal |
 
 ## Pokretanje
 
